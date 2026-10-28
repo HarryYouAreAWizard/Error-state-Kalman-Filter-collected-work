@@ -1,3 +1,5 @@
+# yes, chat made this
+
 # --- Compiler Configuration ---
 CC       = gcc
 CFLAGS   = -O3 -Wall -Wextra -Wpedantic -std=c11 -fPIC
@@ -41,7 +43,7 @@ CMSIS_DSP_SRCS = \
     $(CMSIS_DSP_DIR)/Source/TransformFunctions/TransformFunctions.c \
     $(CMSIS_DSP_DIR)/Source/WindowFunctions/WindowFunctions.c
 
-# --- Your Kalman Filter Source Files ---
+# --- Kalman Filter Source Files ---
 PROJECT_SRCS = $(wildcard src/*.c)
 
 # --- Object File Transformations ---
