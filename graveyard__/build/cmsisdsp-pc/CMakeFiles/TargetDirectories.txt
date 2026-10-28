@@ -1,3 +1,0 @@
-/home/noah/NEXT/Error-State-Kalman-Filter-standalone/build/cmsisdsp-pc/CMakeFiles/CMSISDSP.dir
-/home/noah/NEXT/Error-State-Kalman-Filter-standalone/build/cmsisdsp-pc/CMakeFiles/edit_cache.dir
-/home/noah/NEXT/Error-State-Kalman-Filter-standalone/build/cmsisdsp-pc/CMakeFiles/rebuild_cache.dir
