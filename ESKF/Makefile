@@ -1,100 +1,71 @@
+# --- Compiler Configuration ---
+CC       = gcc
+CFLAGS   = -O3 -Wall -Wextra -Wpedantic -std=c11 -fPIC
 
+TARGET   = eskf_filter
+SHARED_LIB = libeskf.so
 
+# --- Directory Paths ---
+THIRDPARTY_DIR = third_party
+CMSIS_DSP_DIR  = $(THIRDPARTY_DIR)/CMSIS-DSP
+CMSIS_5_DIR    = $(THIRDPARTY_DIR)/CMSIS_5
 
-CC = gcc # compiler choice
-LD := ld # linker choice
+# --- Include Paths ---
+INCLUDES = \
+    -I$(CMSIS_DSP_DIR)/Include \
+    -I$(CMSIS_DSP_DIR)/PrivateInclude \
+    -I$(CMSIS_5_DIR)/CMSIS/Core/Include \
+	-Iinclude
 
-# compiler flags
-INCLUDE_DIRS := include \
-				third_party/CMSIS-DSP/Include \
-				third_party/CMSIS_5/CMSIS/Core/Include
+# --- Host Emulation Platform Flags ---
+PLATFORM_FLAGS = -D__GNUC_PYTHON__
 
-CFLAGS := -pg \
-		  $(addprefix -I, $(INCLUDE_DIRS)) \
-		  -fPIC
+# Combine all compilation flags
+ALL_CFLAGS   = $(CFLAGS) $(INCLUDES) $(PLATFORM_FLAGS)
 
-# link to already compiled library
-# LDFLAGS := -Lthird_party/CMSIS-DSP/build/Source \
-# 		   -lCMSISDSP \
-# 		   -lm
-LDFLAGS := -Lbuild/cmsisdsp-pc/ -lCMSISDSP -lm
+# --- Source Files (CMSIS-DSP Bundle Files Only) ---
+CMSIS_DSP_SRCS = \
+    $(CMSIS_DSP_DIR)/Source/BasicMathFunctions/BasicMathFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/BayesFunctions/BayesFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/CommonTables/CommonTables.c \
+    $(CMSIS_DSP_DIR)/Source/ComplexMathFunctions/ComplexMathFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/ControllerFunctions/ControllerFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/DistanceFunctions/DistanceFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/FastMathFunctions/FastMathFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/FilteringFunctions/FilteringFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/InterpolationFunctions/InterpolationFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/MatrixFunctions/MatrixFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/QuaternionMathFunctions/QuaternionMathFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/StatisticsFunctions/StatisticsFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/SupportFunctions/SupportFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/TransformFunctions/TransformFunctions.c \
+    $(CMSIS_DSP_DIR)/Source/WindowFunctions/WindowFunctions.c
 
+# --- Your Kalman Filter Source Files ---
+PROJECT_SRCS = $(wildcard src/*.c)
 
-libmain: $(wildcard src/*.c) \
-		 $(wildcard include/*.h)
-		 $(CC) $(CFLAGS) \
-		 $(wildcard src/*.c) \
-		 -shared \
-		 -o libmain.so \
-		 $(LDFLAGS)
+# --- Object File Transformations ---
+OBJS = $(CMSIS_DSP_SRCS:.c=.o) $(PROJECT_SRCS:.c=.o)
+
+# --- Build Rules ---
+.PHONY: all shared clean
+
+# Default builds both the standalone executable and the shared library
+all: $(TARGET) $(SHARED_LIB)
+
+# Target for standard standalone application
+$(TARGET): $(OBJS)
+	$(CC) $(OBJS) -o $(TARGET) -lm
+
+# Target for Python shared object library
+shared: $(SHARED_LIB)
+
+$(SHARED_LIB): $(OBJS)
+	$(CC) -shared $(OBJS) -o $(SHARED_LIB) -lm
+
+# Rule for compiling all C source files
+%.o: %.c
+	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR)
-	rm libmain.so
-
-
-
-# # specify compiler and linker
-# CC = gcc
-# LD := ld # the name of the linker is ld
-
-
-# # Specify paths to header and library directories
-# INCLUDE_DIRS = 	include \
-# 				third_party/CMSIS-DSP/Include \
-# 				third_party/CMSIS_5/CMSIS/Core/Include
-
-# LIBRARIES = third_party/CMSIS-DSP/build/Source/libCMSISDSP.a
-
-# CFLAGS :=  $(addprefix -I, $(INCLUDE_DIRS)) -Wall -Wpedantic
-# LDFLAGS := $(LIBRARIES)
-
-
-# # where to put the build files
-# BUILD_DIR := build
-
-# # specify that the source files are everyting in src that end with .c
-# C_SOURCES := $(wildcard src/*.c)
-
-
-# # the objects to be created in the build directory are one-to-one with the source files
-# OBJECTS = 	$(C_SOURCES:%.c=$(BUILD_DIR)/%.o)
-
-# # compile the sourcefiles one at a time and put the objects in the build directory
-# $(BUILD_DIR)/%.o: %.c
-# 	@mkdir -p $(dir $@)
-# 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
-
-# # the target build. Made by linking the objects and the libraries together? -shared makes it a shared library
-# libmain.so:$(OBJECTS)
-# 	@mkdir -p $(dir $@)
-# 	$(LD) $(OBJECTS) $(LDFLAGS) -shared -o $@ 
-
-# # $@ refers to the target itself 
-
-# clean:
-# 	rm -rf $(BUILD_DIR)
-
-# .PHONY: all clean
-
-
-# legacy compiler flags
-# CFLAGS := -pg -Iinclude -Ithird_party/CMSIS-DSP/Include -Ithird_party/CMSIS_5/CMSIS/Core/Include
-# LDFLAGS := -Lthird_party/CMSIS-DSP/build/Source -lCMSISDSP -lm
-
-
-# # build main shared library
-# libmain: src/user/ofelas/main.c src/user/ofelas/estimator.c src/user/ofelas/measurement_handler.c src/user/ofelas/ESKF.c src/user/ofelas/quaternions.c src/user/ofelas/linalg.c include/user/ofelas/estimator.h include/user/ofelas/measurement_handling.h include/user/ofelas/ESKF.h include/user/ofelas/quaternions.h include/user/ofelas/linalg.h
-# 	$(CC) $(CFLAGS) -fPIC src/user/ofelas/main.c src/user/ofelas/estimator.c src/user/ofelas/measurement_handler.c src/user/ofelas/ESKF.c src/user/ofelas/quaternions.c src/user/ofelas/linalg.c -shared -o libmain.so $(LDFLAGS)
-
-
-
-
-
-# # ensure cmsis-dsp library is built
-# CFLAGS = -pg -Iinclude -Ithird_party/CMSIS-DSP/Include -Ithird_party/CMSIS_5/CMSIS/Core/Include
-# LDFLAGS = -pg -Lthird_party/CMSIS-DSP/build/Source -lCMSISDSP -lm
-
-# # build main
-# main: src/user/ofelas/main.c src/user/ofelas/estimator.c src/user/ofelas/ESKF.c src/user/ofelas/measurement_handler.c src/user/ofelas/quaternions.c src/user/ofelas/linalg.c include/user/ofelas/measurement_handling.h include/user/ofelas/ESKF.h include/user/ofelas/estimator.h include/user/ofelas/quaternions.h include/user/ofelas/linalg.h
-# 	$(CC) $(CFLAGS) src/user/ofelas/main.c src/user/ofelas/estimator.c src/user/ofelas/ESKF.c src/user/ofelas/measurement_handler.c src/user/ofelas/quaternions.c src/user/ofelas/linalg.c -o main $(LDFLAGS)
+	rm -f $(OBJS) $(TARGET) $(SHARED_LIB)

@@ -7,9 +7,10 @@ import ctypes
 import numpy as np
 
 def load_library(path=None):
-    lib_path = "/home/noah/NEXT/estimator_stand_alone_builder/Error-State-Kalman-Filter-standalone/libmain.so"
-    lib_path = "/home/noah/NEXT/ESKF_shockwave_simulations/Error-State-Kalman-Filter-standalone/libmain.so"
-    lib_path = "/home/noah/NEXT/Error-State-Kalman-Filter-standalone/libmain.so"
+    # lib_path = "/home/noah/NEXT/estimator_stand_alone_builder/Error-State-Kalman-Filter-standalone/libmain.so"
+    # lib_path = "/home/noah/NEXT/ESKF_shockwave_simulations/Error-State-Kalman-Filter-standalone/libmain.so"
+    # lib_path = "/home/noah/NEXT/Error-State-Kalman-Filter-standalone/libmain.so"
+    lib_path = "../ESKF/libeskf.so"
     if path is not None:
         lib_path = path
 
