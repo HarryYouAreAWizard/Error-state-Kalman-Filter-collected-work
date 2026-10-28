@@ -9,7 +9,7 @@ from wrap_quat import quaternion2eulerangles, ArmMatrix
 from phyphox_reader import read_one_datapoint
 
 
-IP = "192.168.43.201:8080"
+IP = "192.168.43.45:8080"
 # IP = "172.20.10.1"
 host = f"http://{IP}" 
 
