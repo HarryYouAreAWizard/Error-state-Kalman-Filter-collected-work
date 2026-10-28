@@ -7,3 +7,5 @@
 sim_and_livetest/__pycache__*/
 
 graveyard/*
+
+src/*.o
