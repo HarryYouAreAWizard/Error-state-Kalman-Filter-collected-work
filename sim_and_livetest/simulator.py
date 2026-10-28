@@ -56,7 +56,7 @@ shockwave = spiky_sinusoidal
 # sensor parameters
 GNSS_VARIANCE           = array([10.0]*3)**2  /100 # m^2
 BAROMETER_VARIANCE      = 10**2             /100 # Pa^2
-ACCELEROMETER_VARIANCE  = array([0.1]*3)**2  /1 # m/s^2 ^2 
+ACCELEROMETER_VARIANCE  = array([0.5]*3)**2  /1 # m/s^2 ^2 
 GYROSCOPE_VARIANCE      = array([0.03]*3)**2 /1 # /s ^2
 MAGNETOMETER_VARIANCE   = array([1.0]*3)**2  /1 # µT ^2
 ACCELEROMETER_BIAS      = array([0.2, 0.1, 0.3])  * 0.0

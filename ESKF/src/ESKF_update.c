@@ -591,6 +591,9 @@ int update(ErrorStateKalmanFilter *self,
     uint8_t gns_new, uint8_t bar_new, 
     uint8_t acc_new, uint8_t mag_new){
 
+
+    mag_new = 0;
+    // acc_new = 0;
     int error;
 
     // no need to run if no measurements available
