@@ -18,18 +18,18 @@ data_folder = r"Simulations\data"
 # data_folder = r"C:\Users\NoahH\OneDrive - UiT Office 365\Personal OneDrive copy\Tromsø\UiT Arctic University of Norway\Ignite\NEXT\Simulations\data"
 
 # core simulation solver
-def rungekutta_step(f:'function', tn:float, Qn:array, time_step:float):
+def rungekutta_step(f:'function', tn:float, Qn:array, sim_config):
     '''One iteration of the Runge-Kutta method
     
     Parameters:
     f (function): The derivative of y. f = dydt(t, y) 
     tn (float): current time step
     Qn (numpy array): an array of variables in the format (x, dxdt, y, dydt, z, dzdt). Can include more variables'''
-    
-    k1 = f(tn, Qn)
-    k2 = f(tn + time_step/2, Qn + time_step*k1/2)
-    k3 = f(tn + time_step/2, Qn + time_step*k2/2)
-    k4 = f(tn + time_step, Qn +   time_step*k3)
+    time_step=sim_config["TIME_STEP"]
+    k1 = f(tn, Qn, sim_config)
+    k2 = f(tn + time_step/2, Qn + time_step*k1/2, sim_config)
+    k3 = f(tn + time_step/2, Qn + time_step*k2/2, sim_config)
+    k4 = f(tn + time_step, Qn +   time_step*k3, sim_config)
     
     tnext = tn + time_step
     Qnext = Qn + time_step/6 * (k1+ 2*k2 + 2*k3 + k4)
@@ -37,34 +37,9 @@ def rungekutta_step(f:'function', tn:float, Qn:array, time_step:float):
     return tnext, Qnext
 
 
-# simulation parameters
-GRAVITY     = 9.82 # m/s2
-THRUST      = 5e3 # N
-ROCKET_MASS = 40.0 # kg
-DRAG_COEFFICIENCT_REDUCED = 0.01
-IDLE_TIME   = 10.0 # s
-BOOST_TIME  = 5.0 # s
-ROCKET_INITIAL_QUAT = array([1.0, 0.0, 0.0, 0.0])
-ROCKET_INITIAL_PITCH = 0.0
-TIME_STEP = 0.01
-MAX_ITERATIONS = 100000
-
-SPEED_OF_SOUND = 340 # m/s
-shockwave = spiky_sinusoidal
-# SHOCKWAVE_AMPLITUDE = 500.0
-
-# sensor parameters
-GNSS_VARIANCE           = array([10.0]*3)**2  /100 # m^2
-BAROMETER_VARIANCE      = 10**2             /100 # Pa^2
-ACCELEROMETER_VARIANCE  = array([0.5]*3)**2  /1 # m/s^2 ^2 
-GYROSCOPE_VARIANCE      = array([0.03]*3)**2 /1 # /s ^2
-MAGNETOMETER_VARIANCE   = array([1.0]*3)**2  /1 # µT ^2
-ACCELEROMETER_BIAS      = array([0.2, 0.1, 0.3])  * 0.0
-GYROSCOPE_BIAS          = array([0.2, 0.0, 0.0]) * np.pi/180  * 0.0
-
 
 # ODEs for the flight
-def flight_model(t:float, Q:np.array):
+def flight_model(t:float, Q:np.array, sim_config:dict):
     """
     Defines the system of ODEs for free fall with quadratic drag.
 
@@ -77,7 +52,14 @@ def flight_model(t:float, Q:np.array):
     Derivatives of the variables stated in Q.
     """
     # declare global parameters
-    global GRAVITY, THRUST, ROCKET_MASS, DRAG_COEFFICIENCT_REDUCED, IDLE_TIME, BOOST_TIME
+    # global GRAVITY, THRUST, ROCKET_MASS, DRAG_COEFFICIENCT_REDUCED, IDLE_TIME, BOOST_TIME
+    DRAG_COEFFICIENCT_REDUCED = sim_config["DRAG_COEFFICIENCT_REDUCED"]
+    IDLE_TIME = sim_config["IDLE_TIME"]
+    BOOST_TIME = sim_config["BOOST_TIME"]
+    THRUST = sim_config["THRUST"]
+    GRAVITY = sim_config["GRAVITY"]
+    ROCKET_MASS = sim_config["ROCKET_MASS"]
+
 
     # Extract variables
     x,y,z,vx,vy,vz,qw,qx,qy,qz,_,_,_ = Q # same structure as Kalman Filter
@@ -145,7 +127,25 @@ def flight_model(t:float, Q:np.array):
     return np.array([dxdt, dydt, dzdt, dvxdt, dvydt, dvzdt, dqwdt, dqxdt, dqydt, dqzdt, *omega])
 
 # run the simulation
-def sim(shockwave_amplitude):
+def sim(sim_config):
+    # simulation parameters
+    TIME_STEP= sim_config["TIME_STEP"] #,
+    shockwave_amplitude= sim_config["shockwave_amplitude"] #,
+    GNSS_VARIANCE= sim_config["GNSS_VARIANCE"] #,
+    BAROMETER_VARIANCE= sim_config["BAROMETER_VARIANCE"] #,
+    ACCELEROMETER_VARIANCE= sim_config["ACCELEROMETER_VARIANCE"] #,
+    GYROSCOPE_VARIANCE= sim_config["GYROSCOPE_VARIANCE"] #,
+    MAGNETOMETER_VARIANCE= sim_config["MAGNETOMETER_VARIANCE"] #,
+    ACCELEROMETER_BIAS= sim_config["ACCELEROMETER_BIAS"] #,
+    GYROSCOPE_BIAS= sim_config["GYROSCOPE_BIAS"] #
+    GRAVITY= sim_config["GRAVITY"] #     = 9.82 # m/s2
+    ROCKET_INITIAL_QUAT= sim_config["ROCKET_INITIAL_QUAT"] # = array([1.0, 0.0, 0.0, 0.0])
+    MAX_ITERATIONS= sim_config["MAX_ITERATIONS"] # = 100000
+    SPEED_OF_SOUND= sim_config["SPEED_OF_SOUND"] # = 340 # m/s
+    shockwave= sim_config["shockwave"] # = spiky_sinusoidal
+    # SHOCKWAVE_AMPLITUDE = 500.0
+
+
     # run sim
     # initialize sensors
     gns = GNSS(
@@ -211,8 +211,8 @@ def sim(shockwave_amplitude):
         # run until rocket hits the ground
         if Qn[2] < 0 and tn > 10.0:
             break
-        tn, Qn = rungekutta_step(flight_model, tn, Qn, TIME_STEP)
-        dxdt, dydt, dzdt, dvxdt, dvydt, dvzdt, dqwdt, dqxdt, dqydt, dqzdt, *omega = flight_model(tn, Qn)
+        tn, Qn = rungekutta_step(flight_model, tn, Qn, sim_config)
+        dxdt, dydt, dzdt, dvxdt, dvydt, dvzdt, dqwdt, dqxdt, dqydt, dqzdt, *omega = flight_model(tn, Qn, sim_config)
 
         # all vectors are rotated the opposite way as the orientation quaterion
         # attitude_quaternion = euler_angles_to_quaternion(roll=Qn[-3], pitch=Qn[-2], yaw=Qn[-1])
@@ -261,84 +261,17 @@ def sim(shockwave_amplitude):
     velocity = array(velocity)
     attitude = array(attitude)
 
-    return (
-        time,
-        position,
-        velocity,
-        attitude,
-        gns_measurements,
-        bar_measurements,
-        acc_measurements,
-        gyr_measurements,
-        mag_measurements
-    )
-
-# saving the sim for later analysis
-def save_data(sim_data, title):
-    doc = open(data_folder + "\\" + f"{title}.txt", mode="w")
-
-    # header
-    doc.write(
-        "time" + "," + 
-        "position" + "," + 
-        "velocity" + "," + 
-        "attitude" + "," + 
-        "gns_measurements" + "," + 
-        "bar_measurements" + "," + 
-        "acc_measurements" + "," + 
-        "gyr_measurements" + "," + 
-        "mag_measurements" + "," + "\n"  
-    )
-    for i in range(len(sim_data[0])):
-        for element in sim_data:
-            if len(element) == 3:
-                pass
-            else:
-                doc.write(str(element[i]) + ",")
-
-        doc.write("\n")
-    doc.close()
-
-# plotting
-def plot_raw(
-        time,
-        position,
-        velocity,
-        attitude_axis_angles
-    ):    
-    fig, axs=subplots(3,3, figsize=(10,8))
-    # axs=axs.flatten()
-    axs[0, 0].plot(time, position[:, 0])
-    axs[0, 1].plot(time, position[:, 1])
-    axs[0, 2].plot(time, position[:, 2])
-    axs[1, 0].plot(time, velocity[:, 0])
-    axs[1, 1].plot(time, velocity[:, 1])
-    axs[1, 2].plot(time, velocity[:, 2])
-    axs[2, 0].plot(time, attitude_axis_angles[:, 0]*180/pi)
-    axs[2, 1].plot(time, attitude_axis_angles[:, 1]*180/pi)
-    axs[2, 2].plot(time, attitude_axis_angles[:, 2]*180/pi)
-    axs[0, 0].set_title(r"$p_x$")
-    axs[0, 1].set_title(r"$p_y$")
-    axs[0, 2].set_title(r"$p_z$")
-    axs[1, 0].set_title(r"$v_x$")
-    axs[1, 1].set_title(r"$v_y$")
-    axs[1, 2].set_title(r"$v_z$")
-    axs[2, 0].set_title("roll")
-    axs[2, 1].set_title("pitch")
-    axs[2, 2].set_title("yaw")
-
-    for ax in axs.flatten():
-        ax.set_xlabel("Time [s]")
-    for ax in axs[0, :].flatten():
-        ax.set_ylabel(r"Displacement [m]")
-    for ax in axs[1, :].flatten():
-        ax.set_ylabel(r"Speed [$\frac{\text{m}}{\text{s}}$]")
-    for ax in axs[2, :].flatten():
-        ax.set_ylabel(r"Angle [$\degree$]")
-
-    fig.tight_layout()
-    fig.savefig("figures/initial_sim.png")
-    close()
+    return {
+        "time":time,
+        "position":position,
+        "velocity":velocity,
+        "attitude":attitude,
+        "gns_measurements":gns_measurements,
+        "bar_measurements":bar_measurements,
+        "acc_measurements":acc_measurements,
+        "gyr_measurements":gyr_measurements,
+        "mag_measurements":mag_measurements,
+    }
 
 def plot_measurements(
         time,
@@ -346,8 +279,10 @@ def plot_measurements(
         bar_measurements,
         acc_measurements,
         gyr_measurements,
-        mag_measurements
+        mag_measurements,
+        sim_config,
     ):
+    GRAVITY = sim_config["GRAVITY"]
     fig, axs = subplots(5, figsize=(10, 18))
 
     axs[0].set_title("GNSS")
@@ -385,24 +320,3 @@ def plot_measurements(
     # fig.savefig(r"C:\Users\NoahH\OneDrive - UiT Office 365\Personal OneDrive copy\Tromsø\UiT Arctic University of Norway\Ignite\NEXT\Simulations\figures\measurements.png")
     close()
 
-def main(shockwave_amplitude, savefile = False):
-    print(f"Running sim with shockwave amplitude {shockwave_amplitude}...")
-    sim_data = sim(shockwave_amplitude=shockwave_amplitude)
-    (
-            time,
-            position,
-            velocity,
-            attitude_axis_angles,
-            gns_measurements,
-            bar_measurements,
-            acc_measurements,
-            gyr_measurements,
-            mag_measurements
-        ) = sim_data
-    plot_measurements(time=time, gns_measurements=gns_measurements,bar_measurements=bar_measurements, acc_measurements=acc_measurements, gyr_measurements=gyr_measurements, mag_measurements=mag_measurements)
-    if savefile:
-        save_data(sim_data=sim_data, title="sim_data" + f"-{shockwave_amplitude}")    
-
-    return sim_data
-    
-# main()

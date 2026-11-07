@@ -7,19 +7,19 @@ import matplotlib.pyplot as plt
 from numpy import pi
 
 from sim_src.quaternion_math import quaternion_to_euler_angles
-from simulator import SPEED_OF_SOUND
+# from simulator import SPEED_OF_SOUND
 
 figure_folder = r"figures"
 data_folder = r"Simulations/data"
 
 GRAVITY = 9.8125
 
-# noise in std dev
-gns_nois = np.array([5.0]*3) *1e1  #m
-bar_nois = np.array([5.0]) * 1e1# m
-acc_nois = np.array([1.0]*3) * 1e0 #m/s^2 
-gyr_nois = np.array([1.0]*3) * 1e-3 # m/s
-mag_nois = np.array([1.0]*3) *1e-1 # G
+# # noise in std dev
+# gns_nois = np.array([5.0]*3) *1e1  #m
+# bar_nois = np.array([5.0]) * 1e1# m
+# acc_nois = np.array([1.0]*3) * 1e0 #m/s^2 
+# gyr_nois = np.array([1.0]*3) * 1e-3 # m/s
+# mag_nois = np.array([1.0]*3) *1e-1 # G
 
 
 # running pure C ESKF
@@ -27,30 +27,15 @@ import ctypes
 from estimator_wrap import library, Estimator, _as_float_array, _matrix_to_numpy
 
 
-def load(path):
-    """load simulation data"""
-    doc = open(path)
-    data = dict()
-    for i, line in enumerate(doc):
-        if i == 0:
-            for key in line.split(",")[:-1]:
-                data[key] = []
-        else:
-            for key, element in zip(data.keys(), line.split(",")[:-1]):
-                data[key].append(element)
 
-    data["time"]                = np.array([float(element) for element in data["time"]])
-    data["position"]            = np.array([np.array([(element.split("["))[1].split("]")[0].split()])[0] for element in data["position"]], dtype=np.float32)
-    data["velocity"]            = np.array([np.array([(element.split("["))[1].split("]")[0].split()])[0] for element in data["velocity"]], dtype=np.float32)
-    data["attitude"]            = np.array([np.array([(element.split("["))[1].split("]")[0].split()])[0] for element in data["attitude"]], dtype=np.float32)
-    data["gns_measurements"]    = np.array([np.array([(element.split("["))[1].split("]")[0].split()])[0] for element in data["gns_measurements"]], dtype=np.float32)
-    data["bar_measurements"]    = np.array([float(element) for element in data["bar_measurements"]], dtype=np.float32)
-    data["acc_measurements"]    = np.array([np.array([(element.split("["))[1].split("]")[0].split()])[0] for element in data["acc_measurements"]], dtype=np.float32)
-    data["gyr_measurements"]    = np.array([np.array([(element.split("["))[1].split("]")[0].split()])[0] for element in data["gyr_measurements"]], dtype=np.float32)
-    data["mag_measurements"]    = np.array([np.array([(element.split("["))[1].split("]")[0].split()])[0] for element in data["mag_measurements"]], dtype=np.float32)
-    return data
-
-def calculate_rms_error(true_position, true_velocity, true_attitude, estimated_position, estimated_velocity, estimated_attitude):
+def calculate_rms_error(
+        true_position, 
+        true_velocity, 
+        true_attitude, 
+        estimated_position, 
+        estimated_velocity, 
+        estimated_attitude
+    ):
     """calculate post 'flight' rms error"""
     position_error = np.linalg.norm(true_position - estimated_position, axis=1)
     velocity_error = np.linalg.norm(true_velocity - estimated_velocity, axis=1)
@@ -66,13 +51,33 @@ def calculate_rms_error(true_position, true_velocity, true_attitude, estimated_p
     rms_attitude_error_quat = np.sqrt(np.mean(attitude_error_quat**2))
     rms_attitude_error_angle = np.sqrt(np.mean(attitude_error_angle**2))
     
-    return rms_position_error, rms_velocity_error, rms_attitude_error_quat, rms_attitude_error_angle
+    return {
+        "rms": {
+            "position": rms_position_error,
+            "velocity": rms_velocity_error, 
+            "attitude_quat": rms_attitude_error_quat, 
+            "attitude_angle": rms_attitude_error_angle,
+        },
+        "timeseries": {
+            "position": attitude_error_angle,
+            "velocity": attitude_error_angle,
+            "attitude_quat": attitude_error_angle,
+            "attitude_angle": attitude_error_angle,
+        },
+        "units": {
+            "position": "m",
+            "velocity": "m/s",
+            "attitude_quat": "--",
+            "attitude_angle": "rad",
+        }
+    }
 
-def get_true_quaternions(data):
-    return data["attitude"]
-
-def run_ESKF_thorugh_data(data):
-
+def run_ESKF_thorugh_data(data, eskf_config):
+    gns_nois = eskf_config["gns_nois"]
+    acc_nois = eskf_config["acc_nois"]
+    gyr_nois = eskf_config["gyr_nois"]
+    mag_nois = eskf_config["mag_nois"]
+    bar_nois = eskf_config["bar_nois"]
     # convert the noise arrays to c-compatible arrays
     gns_nois_c = _as_float_array(gns_nois)
     acc_nois_c = _as_float_array(acc_nois)
@@ -214,7 +219,7 @@ def run_ESKF_thorugh_data(data):
     if detected_launch_time is None:
         detected_launch_time = data["time"][0]
 
-    print(f"Average estimation time per step: {np.mean(estimate_times)*1e3:.5f} ms")
+    # print(f"Average estimation time per step: {np.mean(estimate_times)*1e3:.5f} ms")
     
     true_launch_condition = data["velocity"][:, 2] > 0
     true_launch_index = np.where(true_launch_condition)[0][0]
@@ -230,34 +235,27 @@ def run_ESKF_thorugh_data(data):
     positions = np.array(positions)
     velocities = np.array(velocities)
     attitudes = np.array(attitudes)
-    return (positions, velocities, attitudes, 
-            detected_launch_time, detected_apogee_time, 
-            detected_launch_time_err, detected_apogee_time_err)
+    return {
+        "position":positions, 
+        "velocity":velocities, 
+        "attitude":attitudes, 
+        "detected_launch_time":detected_launch_time, 
+        "detected_apogee_time":detected_apogee_time, 
+        "detected_launch_time_err":detected_launch_time_err, 
+        "detected_apogee_time_err":detected_apogee_time_err,
+    }
 
 
-def plot_raw_ESKF_states(data, title=""):
-    time, states = data
-    positions, velocities, attitudes = states
-    fig, axs=plt.subplots(3, 1)
-
-    axs[0].plot(time, positions[:, 0], label="x")
-    axs[0].plot(time, positions[:, 1], label="y")
-    axs[0].plot(time, positions[:, 2], label="z")
-
-    axs[1].plot(time, velocities)
-    axs[2].plot(time, attitudes)
-
-    for ax in axs.flatten():ax.legend()
-    fig.tight_layout()
-    fig.savefig("figures/ESKF_states.png")
-    plt.close()
-
-
-def plot_true_vs_ESKF(data, states, title=""):
+def plot_true_vs_ESKF(data, states, sim_config, title=""):
     time = data["time"]
-    positions_ESKF, velocities_ESKF, attitudes_ESKF, detected_launch_time, detected_apogee_time = states
+    positions_ESKF = states["position"] 
+    velocities_ESKF = states["velocity"] 
+    attitudes_ESKF = states["attitude"]
+    detected_launch_time = states["detected_launch_time"]
+    detected_apogee_time = states["detected_apogee_time"]
     euler_angles_ESKF = np.array([quaternion_to_euler_angles(attitude) for attitude in attitudes_ESKF])
     true_quaternions = data["attitude"]
+    SPEED_OF_SOUND = sim_config["SPEED_OF_SOUND"]
     
     true_euler_angles = np.array([quaternion_to_euler_angles(true_quaternion) for true_quaternion in true_quaternions])
     true_roll  = true_euler_angles[:, 0]
@@ -311,45 +309,3 @@ def plot_true_vs_ESKF(data, states, title=""):
     fig.tight_layout()
     fig.savefig(figure_folder + "/" + "ESKF_true_vs_estimated" + f"{title}" + ".png")
     plt.close()
-
-def main(data, data_name=None):
-    # path = r"C:\Users\NoahH\OneDrive - UiT Office 365\Personal OneDrive copy\Tromsø\UiT Arctic University of Norway\Ignite\NEXT\Simulations\data\sim_data.txt"
-    if data is None and data_name is not None:
-        path = data_folder + "\\" + data_name + ".txt"
-        data = load(path=path)
-        time = data["time"]
-    else:
-        (
-            time,
-            position,
-            velocity,
-            attitude,
-            gns_measurements,
-            bar_measurements,
-            acc_measurements,
-            gyr_measurements,
-            mag_measurements
-        ) = data
-        data = {
-            "time":time, 
-            "position":position, 
-            "velocity":velocity, 
-            "attitude":attitude, 
-            "gns_measurements":gns_measurements, 
-            "bar_measurements":bar_measurements, 
-            "acc_measurements":acc_measurements, 
-            "gyr_measurements":gyr_measurements, 
-            "mag_measurements":mag_measurements, 
-        }
-    states = run_ESKF_thorugh_data(data)                                #  
-    a, b, c, d, e, detected_launch_time, detected_apogee_time = states  # this is turbo cursed
-    states = (a, b, c, d, e)                                            # 
-    plot_true_vs_ESKF(data, states)
-    true_quaternions = get_true_quaternions(data)
-    pos_err, vel_err, att_err_q, att_err_a = calculate_rms_error(
-        data["position"],
-        data["velocity"],
-        true_quaternions,
-        states[0], states[1], states[2]
-    )
-    return pos_err, vel_err, att_err_q, att_err_a, detected_launch_time, detected_apogee_time
